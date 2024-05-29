@@ -1,49 +1,176 @@
-import { View, Text, TextInput, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import {View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, Alert } from "react-native";
 import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function Busca() {
-    const [usuarios, setUsuarios ] = useState( [] );
-    const [error, setError ] = useState(false);
-    const [busca, setBusca] = useState(false);
-    const [filtro, setFiltro ] = useState(false);
+    const[ clientes, setClientes ] = useState([]);
+    const[ error, setError ] = useState(false);
+    const[ edicao, setEdicao] = useState(false);
+    const[ clientId, setClientId ] = useState(0);
+    const[ clientNome, setClientNome] = useState();
+    const[ clientEmail, setEmail ] = useState();
+    const[ clientSenha, setSenha ] = useState();
+    const[ deleteResposta, setResposta ] = useState(false);
 
-    async function getUsuarios()
-    {
-        await fetch('https://fakestoreapi.com/users', {
+    async function getClientes () {
+        await fetch('http://10.139.75.14:5251/api/Clients/GetAllClients' , {
             method: 'GET',
             headers: {
-              'content-type': 'application/json'
-            }
-          })
-            .then( res => ( res.ok == true ) ? res.json() : false )
-            .then( json => setUsuarios( json ) )
-            .catch( err => setError( true ) )
+                'content-type' : 'application/json'
+            }           
+        })
+        .then( res => res.json())        
+        .then(json => setClientes( json ))
+        .catch(err => setError(true))
     }
 
+    async function getCliente(id) {
+        await fetch('http://10.139.75.14:5251/api/Clients/GetClientId/' + id, {
+            method: 'GET',
+            headers: {
+                'content-type' : 'application/json; charset=UTF=8',
+            },
+        })
+        .then((response) => response.json())
+        .then(json => {
+            setClientId(json.clientId);
+            setClientNome(json.clientName);
+            setEmail(json.clientEmail);
+            setSenha(json.clientPassword);
+        });
+    }
+
+    async function editClient() {
+        console.log(clientId, clientEmail, clientSenha, clientNome);
+        await fetch('http://10.139.75.14:5251/api/Clients/UpdateClients/' + clientId, {
+            method: 'PUT',
+            headers: {
+                'Content-type' : 'application/json; charset=UTF-8',
+            },
+            body: JSON.stringify({
+                clientId: clientId,
+                clientEmail: clientEmail,
+                clientPassword: clientSenha,
+                clientName: clientNome
+            })
+        })
+        .then((response) => response.json())
+        .catch( err => console.log( err ) );
+        getClientes();
+        setEdicao(false);
+    }
+
+    function showAlert(id, clientName){
+        Alert.alert(
+            '',
+            'Deseja realmente excluir esse usuário?',
+            [
+                {text: 'Sim', onPress: () => deleteClient(id, clientName)},
+                {text: 'Não', onPress: () =>('')},
+            ],
+            {cancelable: false }
+        );
+    }
+
+    async function deleteClient(id, clientName){
+        await fetch('http://10.139.75.14:5251/api/Clients/DeleteClients/' + id, {
+            method: 'DELETE',
+            headers: {
+                'Content-type' : 'application/json; charset=UTF-8',
+            },
+        })
+        .then(rs => res.json())
+        .then(json => setResposta(json))
+        .catch( err => setError(true))
+
+        if(deleteResposta == true)
+        {
+            Alert.alert(
+                '',
+                'Cliente' + clientName + 'excluido com sucesso',
+                [
+                    {text: '', onPress: () =>('')},
+                    {text: 'Ok', onPress: () =>('')},
+                ],
+                {cancelable: false }
+            );
+            getClientes();
+        }
+        else
+        {
+            Alert.alert(
+                '',
+                'Cliente' + clientName + 'não foi excluido',
+                [
+                    {text: '', onPress: () =>('')},
+                    {text: 'Ok', onPress: () =>('')},
+                ],
+                {cancelable: false }
+            );
+            getClientes();
+        }
+    };
+
+
     useEffect( () => {
-        getUsuarios();
+        getClientes();
     }, [] );
 
-    useEffect( () => {
-        setFiltro( usuarios.filter( (item) => item.name.firstname == busca )[0] );
-    }, [busca] );
+    useFocusEffect(
+        React.useCallback(() => {
+            getClientes();
+        }, [])
+    );
 
-    return (
+    return(
         <View style={css.container}>
-            <View style={css.searchBox}>
+            {edicao == false ?
+            <FlatList
+            style={css.flat}
+            data={clientes}
+            keyExtractor={(item) => item.clientId}
+            renderItem={({ item }) => (
+                <Text style={css.text}>
+                    {item.clientName}
+                    <TouchableOpacity style={css.btnEdit} onPress={() => { setEdicao(true); getCliente(item.clientId) }}>
+                        <Text style={css.btnTextEditar}>EDITAR</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={css.btnDelete} onPress={() => showAlert(item.clientId, item.clientName)}>
+                        <Text style={css.btnText}>EXCLUIR</Text>
+                    </TouchableOpacity>
+                </Text>
+            )}
+            />
+            :
+      <View style={css.editar}>
                 <TextInput
-                    style={css.search}
-                    placeholder="Buscar usuarios"
-                    placeholderTextColor="white"
-                    TextInput={busca}
-                    onChangeText={(digitado) => setBusca( digitado ) }
+                inputMode="text"
+                style={css.input}
+                value={clientNome}
+                onChangeText={(digitado) => setClientNome(digitado)}
+                placeholderTextColor="black"               
                 />
+                <TextInput
+                inputMode="email"
+                style={css.input}
+                value={clientEmail}
+                onChangeText={(digitado) => setEmail(digitado)}
+                placeholderTextColor="black"               
+                />
+                <TextInput
+                inputMode="text"
+                style={css.input}
+                value={clientSenha}
+                onChangeText={(digitado) => setSenha(digitado)}
+                placeholderTextColor="black"               
+                />
+                <TouchableOpacity style={css.btnCreate} onPress={() => editClient()}>
+                    <Text style={css.btnText}>SALVAR</Text>
+                </TouchableOpacity>
             </View>
-            { filtro && <Text style={css.text}>{filtro.name.firstname} {filtro.name.lastname}</Text> }
-            { ( !filtro && busca ) && <ActivityIndicator size="large" color="white" /> }
-        </View>
-    )
-}
+             }
+            </View>
+               )}
 const css = StyleSheet.create({
     container: {
         flexGrow: 1,
@@ -54,19 +181,52 @@ const css = StyleSheet.create({
     text: {
         color: "white"
     },
-    searchBox: {
-        width: "100%",
-        height: 100,
-        justifyContent: "flex-end",
-        alignItems: "center",
-    },
-    search: {
-        width: "96%",
-        height: 60,
-        borderWidth: 1,
-        borderColor: "white",
-        borderRadius: 8,
-        padding: 10,
+    input: {
+        width: "90%",
+        height: 50,
+        borderRadius: 10,
+        marginBottom: 15,
+        padding: 15,
+        backgroundColor: "#262626",
         color: "white"
+    },
+    btnEdit: {
+        width: "90%",
+        height: 50,
+        borderWidth: 1,
+        borderRadius: 10,
+        marginTop: 30,
+        backgroundColor: "#1E90FF"
+    },
+    btnDelete: {
+        width: "90%",
+        height: 50,
+        borderWidth: 1,
+        borderRadius: 10,
+        marginTop: 30,
+        backgroundColor: "#DC143C"
+    },
+    btnCreate: {
+        width: "90%",
+        height: 50,
+        borderWidth: 1,
+        borderRadius: 10,
+        marginTop: 30,
+        backgroundColor: "#7B68EE"
+    },
+    btnText: {
+        fontSize: 15,
+        lineHeight: 30,
+        color: "white",
+        fontWeight: "bold",
+        textAlign: "center"
+    },
+    btnTextEditar: {
+        fontSize: 15,
+        lineHeight: 30,
+        color: "white",
+        fontWeight: "bold",
+        textAlign: "center"
     }
+    
 })
